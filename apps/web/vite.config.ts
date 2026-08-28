@@ -32,7 +32,10 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        // cangxue-backend listens on PORT=3000 by default; the web dev server
+        // also uses 3000, so run the backend on another port (e.g. PORT=3001)
+        // and point this proxy at it, or set VITE_API_TARGET.
+        target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
         changeOrigin: true,
       },
     },

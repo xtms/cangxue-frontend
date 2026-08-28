@@ -1,72 +1,132 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrackItem } from '@music-app/ui';
-import { usePlayerStore } from '@music-app/core';
+import { Link } from 'react-router-dom';
+import type { Song } from '@music-app/core';
+import { apiClient } from '../lib/api';
+import { Artwork } from '../components/Artwork';
+import { SongRow } from '../components/SongRow';
+
+type Tab = 'recommend' | 'rank' | 'sheets';
+
+const tabs: { key: Tab; label: string }[] = [
+  { key: 'recommend', label: '推荐' },
+  { key: 'rank', label: '排行榜' },
+  { key: 'sheets', label: '歌单' },
+];
 
 export function HomePage() {
-  const playTrack = usePlayerStore(s => s.playTrack);
+  const [tab, setTab] = useState<Tab>('recommend');
 
-  const { data: recentTracks, isLoading } = useQuery({
-    queryKey: ['tracks', 'recent'],
-    queryFn: async () => {
-      const response = await fetch('/api/tracks?page=1');
-      if (!response.ok) throw new Error('Failed to fetch tracks');
-      return response.json();
-    },
+  const songs = useQuery({
+    queryKey: ['songs', 'home'],
+    queryFn: () => apiClient.songs.list({ limit: 50 }),
   });
-
-  const { data: playlists } = useQuery({
+  const playlists = useQuery({
     queryKey: ['playlists'],
-    queryFn: async () => {
-      const response = await fetch('/api/playlists?page=1');
-      if (!response.ok) throw new Error('Failed to fetch playlists');
-      return response.json();
-    },
+    queryFn: () => apiClient.playlists.list(),
   });
+
+  const items = songs.data?.items ?? [];
+  const queueIds = items.map((s) => s.id);
+  const ranked = [...items].sort((a, b) => (b.plays ?? 0) - (a.plays ?? 0));
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">推荐歌曲</h2>
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-gray-200 animate-pulse rounded-lg h-20" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {recentTracks?.items?.map((track: any) => (
-              <TrackItem
-                key={track.id}
-                title={track.title}
-                artist={`Artist ${track.artistId?.slice(0, 8)}`}
-                coverUrl={track.coverUrl}
-                onPlay={() => playTrack(track.id, recentTracks.items.map((t: any) => t.id))}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+    <div className="space-y-4">
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === t.key ? 'bg-white text-primary-600 shadow-sm' : 'text-gray-500'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">我的歌单</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {playlists?.items?.map((playlist: any) => (
-            <div
-              key={playlist.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-            >
-              <div className="w-full aspect-square bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
-                <svg className="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M0 2a2 2 0 012-2h16a2 2 0 012 2v12a2 2 0 01-2 2H2a2 2 0 01-2-2V2zm4 0v12h12V2H4z" />
-                </svg>
-              </div>
-              <h3 className="font-medium text-gray-900 truncate">{playlist.title}</h3>
-              <p className="text-sm text-gray-500">{playlist.trackIds?.length || 0} 首歌曲</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {tab === 'recommend' && <SongList songs={items} queueIds={queueIds} loading={songs.isLoading} />}
+      {tab === 'rank' && <RankList songs={ranked} queueIds={queueIds} loading={songs.isLoading} />}
+      {tab === 'sheets' && <PlaylistGrid loading={playlists.isLoading} />}
     </div>
   );
+}
+
+function SongList({ songs, queueIds, loading }: { songs: Song[]; queueIds: number[]; loading: boolean }) {
+  if (loading) return <Skeleton rows={6} />;
+  if (songs.length === 0) return <Empty text="还没有歌曲，去后端上传一些吧" />;
+  return (
+    <div className="space-y-1">
+      {songs.map((s) => (
+        <SongRow key={s.id} song={s} queue={queueIds} />
+      ))}
+    </div>
+  );
+}
+
+function RankList({ songs, queueIds, loading }: { songs: Song[]; queueIds: number[]; loading: boolean }) {
+  if (loading) return <Skeleton rows={6} />;
+  if (songs.length === 0) return <Empty text="暂无排行数据" />;
+  return (
+    <div className="space-y-1">
+      {songs.map((s, i) => (
+        <div key={s.id} className="flex items-center gap-3 p-2">
+          <span className={`w-6 text-center text-sm font-bold ${i < 3 ? 'text-primary-600' : 'text-gray-400'}`}>
+            {i + 1}
+          </span>
+          <div className="flex-1 min-w-0">
+            <SongRow song={s} queue={queueIds} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlaylistGrid({ loading }: { loading: boolean }) {
+  const playlists = useQuery({
+    queryKey: ['playlists'],
+    queryFn: () => apiClient.playlists.list(),
+  });
+  if (loading || playlists.isLoading) return <Skeleton rows={3} />;
+  const list = playlists.data ?? [];
+  if (list.length === 0) return <Empty text="还没有歌单，去「我的」创建一个" />;
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {list.map((pl) => (
+        <Link key={pl.id} to={`/playlist/${pl.id}`} className="block">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            <div className="w-full aspect-square">
+              <Artwork size="lg" rounded="rounded-none" />
+            </div>
+            <div className="p-2">
+              <p className="text-sm font-medium text-gray-900 truncate">{pl.name}</p>
+              <p className="text-xs text-gray-400">{pl.description || '歌单'}</p>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function Skeleton({ rows }: { rows: number }) {
+  return (
+    <div className="space-y-2">
+      {[...Array(rows)].map((_, i) => (
+        <div key={i} className="flex items-center gap-3 p-2">
+          <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-gray-200 rounded animate-pulse w-1/2" />
+            <div className="h-2 bg-gray-200 rounded animate-pulse w-1/4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="text-center text-sm text-gray-400 py-12">{text}</div>;
 }

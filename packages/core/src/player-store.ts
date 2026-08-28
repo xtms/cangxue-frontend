@@ -1,19 +1,20 @@
 import { create } from 'zustand';
-import type { PlaybackState, PlaybackStatus, Track } from './types.js';
 import type { AudioEngine } from './audio-engine.js';
 import type { MusicApiClient } from './api-client.js';
 import type { MediaCache } from './media-cache.js';
+import type { PlaybackState, PlaybackStatus, Song } from './types.js';
 
 interface PlayerStore extends PlaybackState {
   audioEngine: AudioEngine | null;
   apiClient: MusicApiClient | null;
   mediaCache: MediaCache | null;
+  currentSong: Song | null;
 
   setAudioEngine: (engine: AudioEngine) => void;
   setApiClient: (client: MusicApiClient) => void;
   setMediaCache: (cache: MediaCache) => void;
 
-  playTrack: (trackId: string, queue?: string[]) => Promise<void>;
+  playTrack: (songId: number, queue?: number[]) => Promise<void>;
   play: () => Promise<void>;
   pause: () => void;
   seek: (ms: number) => void;
@@ -22,13 +23,13 @@ interface PlayerStore extends PlaybackState {
   prev: () => Promise<void>;
   toggleRepeat: () => void;
   toggleShuffle: () => void;
-  addToQueue: (trackId: string) => void;
+  addToQueue: (songId: number) => void;
   removeFromQueue: (index: number) => void;
   clearQueue: () => void;
 }
 
 const initialState: PlaybackState = {
-  currentTrackId: null,
+  currentSongId: null,
   status: 'idle',
   positionMs: 0,
   durationMs: 0,
@@ -44,25 +45,22 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   audioEngine: null,
   apiClient: null,
   mediaCache: null,
+  currentSong: null,
 
   setAudioEngine: (engine) => {
     set({ audioEngine: engine });
 
-    engine.onStatus((status) => {
-      set({ status });
-    });
+    engine.onStatus((status) => set({ status }));
 
-    engine.onProgress((positionMs, durationMs) => {
-      set({ positionMs, durationMs });
-    });
+    engine.onProgress((positionMs, durationMs) => set({ positionMs, durationMs }));
 
     engine.onEnded(() => {
       const state = get();
       if (state.repeat === 'one') {
         engine.seek(0);
-        engine.play();
+        void engine.play();
       } else {
-        get().next();
+        void get().next();
       }
     });
   },
@@ -70,15 +68,16 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   setApiClient: (client) => set({ apiClient: client }),
   setMediaCache: (cache) => set({ mediaCache: cache }),
 
-  playTrack: async (trackId, queue) => {
+  playTrack: async (songId, queue) => {
     const { audioEngine, apiClient, mediaCache } = get();
     if (!audioEngine || !apiClient) return;
 
-    const newQueue = queue || [trackId];
-    const index = newQueue.indexOf(trackId);
+    const newQueue = queue || [songId];
+    const index = newQueue.indexOf(songId);
 
     set({
-      currentTrackId: trackId,
+      currentSongId: songId,
+      currentSong: null,
       queue: newQueue,
       index,
       status: 'loading',
@@ -88,20 +87,20 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
     try {
       let streamUrl: string | null = null;
-
       if (mediaCache) {
-        streamUrl = await mediaCache.url(trackId);
+        streamUrl = await mediaCache.url(songId);
       }
-
       if (!streamUrl) {
-        streamUrl = apiClient.tracks.streamUrl(trackId);
+        streamUrl = apiClient.songs.streamUrl(songId);
       }
 
-      const track = await apiClient.tracks.get(trackId);
-      const trackWithUrl = { ...track, streamUrl };
-
-      await audioEngine.load(trackWithUrl);
+      const song = await apiClient.songs.get(songId);
+      set({ currentSong: song });
+      await audioEngine.load({ ...song, streamUrl });
       await audioEngine.play();
+
+      // Best-effort play-count recording (backend POST /songs/{id}/play).
+      void apiClient.songs.play(songId).catch(() => undefined);
     } catch (error) {
       set({ status: 'error' });
       console.error('Failed to play track:', error);
@@ -149,7 +148,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         return;
       }
     }
-
     await get().playTrack(queue[nextIndex], queue);
   },
 
@@ -170,7 +168,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         prevIndex = 0;
       }
     }
-
     await get().playTrack(queue[prevIndex], queue);
   },
 
@@ -184,10 +181,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     set((state) => ({ shuffle: !state.shuffle }));
   },
 
-  addToQueue: (trackId) => {
-    set((state) => ({
-      queue: [...state.queue, trackId],
-    }));
+  addToQueue: (songId) => {
+    set((state) => ({ queue: [...state.queue, songId] }));
   },
 
   removeFromQueue: (index) => {
@@ -205,6 +200,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
   },
 
   clearQueue: () => {
-    set({ queue: [], index: -1, currentTrackId: null, status: 'idle' });
+    set({ queue: [], index: -1, currentSongId: null, currentSong: null, status: 'idle' });
   },
 }));

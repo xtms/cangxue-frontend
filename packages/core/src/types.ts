@@ -1,83 +1,70 @@
+// Domain types aligned to the real cangxue-backend API contract
+// (see app/modules/{auth,songs,playlists}). IDs are integers server-side.
+
 export interface User {
-  id: string;
-  nickname: string;
-  avatarUrl?: string;
-}
-
-export interface Artist {
-  id: string;
-  name: string;
-  avatarUrl?: string;
-  bio?: string;
-}
-
-export interface Album {
-  id: string;
-  title: string;
-  coverUrl?: string;
-  artistId: string;
-  releaseYear?: number;
-  trackIds: string[];
-}
-
-export interface Track {
-  id: string;
-  title: string;
-  durationMs: number;
-  artistId: string;
-  albumId?: string;
-  coverUrl?: string;
-  streamUrl?: string;
-  codec?: 'mp3' | 'aac' | 'flac' | 'ogg';
-}
-
-export interface Playlist {
-  id: string;
-  title: string;
-  ownerUserId: string;
-  trackIds: string[];
-  coverUrl?: string;
+  id: number;
+  username: string;
+  email: string;
   createdAt: string;
 }
 
-export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
-
-export interface PlaybackState {
-  currentTrackId: string | null;
-  status: PlaybackStatus;
-  positionMs: number;
-  durationMs: number;
-  queue: string[];
-  index: number;
-  repeat: 'off' | 'all' | 'one';
-  shuffle: boolean;
-  volume: number;
-}
-
-export interface TokenSet {
-  accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
-}
-
-export interface Page<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export type SearchType = 'track' | 'album' | 'artist' | 'playlist';
-
-export interface SearchResult {
-  tracks: Page<Track>;
-  albums: Page<Album>;
-  artists: Page<Artist>;
-  playlists: Page<Playlist>;
+export interface AuthResponse {
+  user: User;
+  token: string;
 }
 
 export interface RegisterInput {
   username: string;
+  email: string;
   password: string;
-  nickname?: string;
+}
+
+// `duration` is in seconds (backend `duration_seconds`). `streamUrl` is a
+// transient, client-set field (built by the HTTP client, never sent by server).
+export interface Song {
+  id: number;
+  title: string;
+  artist?: string | null;
+  album?: string | null;
+  artistId?: number | null;
+  albumId?: number | null;
+  year?: number | null;
+  duration?: number | null;
+  mimeType?: string | null;
+  size?: number | null;
+  plays?: number | null;
+  createdAt?: string;
+  streamUrl?: string;
+}
+
+export interface Playlist {
+  id: number;
+  name: string;
+  description?: string | null;
+  ownerId: number;
+  createdAt: string;
+}
+
+// `GET /api/songs/?q=&limit=&offset=` → {items,total,limit,offset}
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+
+// Playback internals are kept in milliseconds (standard audio unit); song
+// durations (seconds) are converted at the boundary.
+export interface PlaybackState {
+  currentSongId: number | null;
+  status: PlaybackStatus;
+  positionMs: number;
+  durationMs: number;
+  queue: number[];
+  index: number;
+  repeat: 'off' | 'all' | 'one';
+  shuffle: boolean;
+  volume: number;
 }

@@ -1,49 +1,51 @@
 import type {
-  TokenSet,
+  AuthResponse,
   Page,
-  Track,
-  Album,
-  Artist,
   Playlist,
-  SearchResult,
-  SearchType,
   RegisterInput,
+  Song,
   User,
 } from './types.js';
 
+export interface ListQuery {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// The cross-platform client surface every app (web / mobile / tv / pad) programs
+// against. Implementations (HttpClient, SelfHostedSource, fakes) satisfy this.
+// Envelope unwrapping ({song}/{playlist}/{user}) and paging normalization happen
+// inside the implementation, so callers receive clean domain objects.
 export interface MusicApiClient {
   auth: {
-    login(username: string, password: string): Promise<TokenSet>;
-    register(input: RegisterInput): Promise<TokenSet>;
-    refresh(refreshToken: string): Promise<TokenSet>;
+    register(input: RegisterInput): Promise<AuthResponse>;
+    login(identifier: string, password: string): Promise<AuthResponse>;
+    me(): Promise<User>;
   };
-  tracks: {
-    list(query?: { q?: string; page?: number }): Promise<Page<Track>>;
-    get(id: string): Promise<Track>;
-    streamUrl(id: string): string;
-  };
-  albums: {
-    list(query?: { page?: number }): Promise<Page<Album>>;
-    get(id: string): Promise<Album>;
-  };
-  artists: {
-    list(query?: { page?: number }): Promise<Page<Artist>>;
-    get(id: string): Promise<Artist>;
+  songs: {
+    list(query?: ListQuery): Promise<Page<Song>>;
+    get(id: number): Promise<Song>;
+    streamUrl(id: number): string;
+    play(id: number): Promise<void>;
+    upload(input: {
+      file: Blob;
+      title?: string;
+      artist?: string;
+      album?: string;
+      year?: number;
+      duration?: number;
+    }): Promise<Song>;
+    remove(id: number): Promise<void>;
   };
   playlists: {
-    list(query?: { page?: number }): Promise<Page<Playlist>>;
-    get(id: string): Promise<Playlist>;
-    create(input: { title: string }): Promise<Playlist>;
-    addTrack(id: string, trackId: string): Promise<void>;
-    removeTrack(id: string, trackId: string): Promise<void>;
-  };
-  search: {
-    query(q: string, type?: SearchType): Promise<SearchResult>;
-  };
-  me: {
-    get(): Promise<User>;
-    history(): Promise<Page<Track>>;
-    favorites(): Promise<Page<Track>>;
-    toggleFavorite(trackId: string, fav: boolean): Promise<void>;
+    list(): Promise<Playlist[]>;
+    get(id: number): Promise<Playlist>;
+    create(input: { name: string; description?: string }): Promise<Playlist>;
+    update(id: number, input: { name?: string; description?: string }): Promise<Playlist>;
+    remove(id: number): Promise<void>;
+    songs(id: number): Promise<Song[]>;
+    addSong(id: number, input: { songId: number; position?: number }): Promise<void>;
+    removeSong(id: number, songId: number): Promise<void>;
   };
 }

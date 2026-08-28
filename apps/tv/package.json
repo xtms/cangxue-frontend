@@ -1,0 +1,9 @@
+{
+  "name": "@music-app/tv",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "echo 'TV app placeholder'",
+    "build": "echo 'TV app placeholder'"
+  }
+}

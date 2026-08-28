@@ -1,0 +1,25 @@
+{
+  "name": "@music-app/core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "zustand": "^4.5.2",
+    "@tanstack/query-core": "^5.35.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@music-app/pad",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "echo 'Pad app placeholder'",
+    "build": "echo 'Pad app placeholder'"
+  }
+}

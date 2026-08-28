@@ -6,7 +6,8 @@ import App from './App';
 import './index.css';
 import { initAudioEngine } from './lib/audio-engine-web';
 import { initMediaCache } from './lib/media-cache-indexeddb';
-import { HttpClient, usePlayerStore } from '@music-app/core';
+import { useAuthStore, usePlayerStore } from '@music-app/core';
+import { apiClient, bootstrapAuth, persistAuth } from './lib/api';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,12 +18,15 @@ const queryClient = new QueryClient({
   },
 });
 
-const apiClient = new HttpClient('/api');
+// Restore session (if any), then keep localStorage in sync with the auth store.
+bootstrapAuth();
+useAuthStore.subscribe((s) => persistAuth(s.user, s.token));
+
+// Wire the cross-platform player store to the web adapters + the shared client.
 const audioEngine = initAudioEngine();
 const mediaCache = initMediaCache();
-
-usePlayerStore.getState().setAudioEngine(audioEngine);
 usePlayerStore.getState().setApiClient(apiClient);
+usePlayerStore.getState().setAudioEngine(audioEngine);
 usePlayerStore.getState().setMediaCache(mediaCache);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -32,5 +36,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <App />
       </BrowserRouter>
     </QueryClientProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

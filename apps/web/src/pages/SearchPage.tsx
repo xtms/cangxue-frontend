@@ -1,100 +1,89 @@
 import { useState } from 'react';
+import type { FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrackItem, Input } from '@music-app/ui';
-import { usePlayerStore } from '@music-app/core';
+import { Link } from 'react-router-dom';
+import { apiClient } from '../lib/api';
+import { Artwork } from '../components/Artwork';
+import { SongRow } from '../components/SongRow';
 
 export function SearchPage() {
-  const [query, setQuery] = useState('');
-  const playTrack = usePlayerStore(s => s.playTrack);
+  const [q, setQ] = useState('');
+  const [submitted, setSubmitted] = useState('');
 
-  const { data: results, isLoading } = useQuery({
-    queryKey: ['search', query],
-    queryFn: async () => {
-      if (!query.trim()) return null;
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-      if (!response.ok) throw new Error('Search failed');
-      return response.json();
-    },
-    enabled: query.trim().length > 0,
+  const songs = useQuery({
+    queryKey: ['songs', 'search', submitted],
+    queryFn: () => apiClient.songs.list({ q: submitted, limit: 50 }),
+    enabled: submitted.length > 0,
+  });
+  const playlists = useQuery({
+    queryKey: ['playlists'],
+    queryFn: () => apiClient.playlists.list(),
+    enabled: submitted.length > 0,
   });
 
+  const filteredPlaylists = (playlists.data ?? []).filter((p) =>
+    p.name.toLowerCase().includes(submitted.toLowerCase()),
+  );
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitted(q.trim());
+  };
+
+  const songItems = songs.data?.items ?? [];
+  const queueIds = songItems.map((s) => s.id);
+
   return (
-    <div className="space-y-6">
-      <div className="max-w-2xl">
-        <Input
-          placeholder="搜索歌曲、专辑、艺人..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+    <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="relative">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="搜索歌曲、歌单"
+          className="w-full pl-10 pr-4 py-2.5 bg-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
-      </div>
+        <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
+        </svg>
+      </form>
 
-      {isLoading && (
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="bg-gray-200 animate-pulse rounded-lg h-16" />
-          ))}
-        </div>
-      )}
-
-      {results && (
+      {submitted.length === 0 ? (
+        <div className="text-center text-sm text-gray-400 py-12">输入关键词搜索歌曲或歌单</div>
+      ) : (
         <>
-          {results.tracks?.items?.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-3">歌曲</h2>
-              <div className="space-y-1">
-                {results.tracks.items.map((track: any) => (
-                  <TrackItem
-                    key={track.id}
-                    title={track.title}
-                    artist={`Artist`}
-                    coverUrl={track.coverUrl}
-                    onPlay={() => playTrack(track.id, results.tracks.items.map((t: any) => t.id))}
-                  />
+          {songs.isLoading && <div className="text-sm text-gray-400">搜索中…</div>}
+
+          {songItems.length > 0 && (
+            <section className="space-y-1">
+              <h3 className="text-sm font-semibold text-gray-700 px-2">歌曲 · {songItems.length}</h3>
+              {songItems.map((s) => (
+                <SongRow key={s.id} song={s} queue={queueIds} />
+              ))}
+            </section>
+          )}
+
+          {filteredPlaylists.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-700 px-2">歌单 · {filteredPlaylists.length}</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {filteredPlaylists.map((pl) => (
+                  <Link key={pl.id} to={`/playlist/${pl.id}`} className="block">
+                    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+                      <Artwork size="lg" rounded="rounded-none" />
+                      <div className="p-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">{pl.name}</p>
+                      </div>
+                    </div>
+                  </Link>
                 ))}
               </div>
             </section>
           )}
 
-          {results.albums?.items?.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-3">专辑</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {results.albums.items.map((album: any) => (
-                  <div
-                    key={album.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <div className="w-full aspect-square bg-gray-200 rounded-lg mb-3" />
-                    <h3 className="font-medium text-gray-900 truncate">{album.title}</h3>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {results.artists?.items?.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-gray-900 mb-3">艺人</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {results.artists.items.map((artist: any) => (
-                  <div
-                    key={artist.id}
-                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <div className="w-24 h-24 mx-auto bg-gray-200 rounded-full mb-3" />
-                    <h3 className="font-medium text-gray-900 text-center truncate">{artist.name}</h3>
-                  </div>
-                ))}
-              </div>
-            </section>
+          {!songs.isLoading && songItems.length === 0 && filteredPlaylists.length === 0 && (
+            <div className="text-center text-sm text-gray-400 py-12">没有找到「{submitted}」相关结果</div>
           )}
         </>
-      )}
-
-      {!isLoading && query && results && !results.tracks?.items?.length && !results.albums?.items?.length && !results.artists?.items?.length && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">未找到相关结果</p>
-        </div>
       )}
     </div>
   );

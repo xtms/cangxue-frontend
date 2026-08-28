@@ -1,6 +1,5 @@
-import type { AudioEngine, Track } from '@music-app/core';
-
-type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+import type { AudioEngine } from '@music-app/core';
+import type { PlaybackStatus, Song } from '@music-app/core';
 
 export function initAudioEngine(): AudioEngine {
   const audio = new Audio();
@@ -10,16 +9,14 @@ export function initAudioEngine(): AudioEngine {
   let progressInterval: number | null = null;
 
   const setStatus = (status: PlaybackStatus) => {
-    statusCallbacks.forEach(cb => cb(status));
+    statusCallbacks.forEach((cb) => cb(status));
   };
 
   const startProgressTracking = () => {
     if (progressInterval) clearInterval(progressInterval);
     progressInterval = window.setInterval(() => {
       if (audio.duration && !isNaN(audio.duration)) {
-        const posMs = audio.currentTime * 1000;
-        const durMs = audio.duration * 1000;
-        progressCallbacks.forEach(cb => cb(posMs, durMs));
+        progressCallbacks.forEach((cb) => cb(audio.currentTime * 1000, audio.duration * 1000));
       }
     }, 500);
   };
@@ -35,32 +32,29 @@ export function initAudioEngine(): AudioEngine {
     setStatus('playing');
     startProgressTracking();
   });
-
   audio.addEventListener('pause', () => {
     setStatus('paused');
     stopProgressTracking();
   });
-
   audio.addEventListener('ended', () => {
     stopProgressTracking();
-    endedCallbacks.forEach(cb => cb());
+    endedCallbacks.forEach((cb) => cb());
   });
-
   audio.addEventListener('error', () => {
     setStatus('error');
     stopProgressTracking();
   });
-
   audio.addEventListener('loadedmetadata', () => {
-    const durMs = audio.duration * 1000;
-    progressCallbacks.forEach(cb => cb(audio.currentTime * 1000, durMs));
+    if (audio.duration && !isNaN(audio.duration)) {
+      progressCallbacks.forEach((cb) => cb(audio.currentTime * 1000, audio.duration * 1000));
+    }
   });
 
   return {
-    load: async (track: Track) => {
+    load: async (song: Song) => {
       setStatus('loading');
-      if (track.streamUrl) {
-        audio.src = track.streamUrl;
+      if (song.streamUrl) {
+        audio.src = song.streamUrl;
         audio.load();
       }
     },
@@ -84,19 +78,19 @@ export function initAudioEngine(): AudioEngine {
     onStatus: (cb) => {
       statusCallbacks.push(cb);
       return () => {
-        statusCallbacks = statusCallbacks.filter(c => c !== cb);
+        statusCallbacks = statusCallbacks.filter((c) => c !== cb);
       };
     },
     onProgress: (cb) => {
       progressCallbacks.push(cb);
       return () => {
-        progressCallbacks = progressCallbacks.filter(c => c !== cb);
+        progressCallbacks = progressCallbacks.filter((c) => c !== cb);
       };
     },
     onEnded: (cb) => {
       endedCallbacks.push(cb);
       return () => {
-        endedCallbacks = endedCallbacks.filter(c => c !== cb);
+        endedCallbacks = endedCallbacks.filter((c) => c !== cb);
       };
     },
   };

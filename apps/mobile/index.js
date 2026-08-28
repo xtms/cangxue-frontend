@@ -1,6 +1,11 @@
-// Mobile app entry point - placeholder
-// TODO: Implement React Native + Expo app
+import { registerRootComponent } from 'expo';
+import TrackPlayer from 'react-native-track-player';
+import App from './App';
+import { PlaybackService } from './src/adapters/playbackService';
 
-export default function App() {
-  return null;
-}
+// Register the background playback service once, before the app mounts. This
+// wires lock-screen / notification / Bluetooth remote controls (defined in
+// PlaybackService) to react-native-track-player.
+TrackPlayer.registerPlaybackService(() => PlaybackService);
+
+registerRootComponent(App);

@@ -1,33 +1,36 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { useAuthStore } from '@music-app/core';
 import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
-import { LibraryPage } from './pages/LibraryPage';
+import { MinePage } from './pages/MinePage';
+import { PlaylistPage } from './pages/PlaylistPage';
+import { NowPlayingPage } from './pages/NowPlayingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { PlaylistPage } from './pages/PlaylistPage';
-import { AlbumPage } from './pages/AlbumPage';
-import { ArtistPage } from './pages/ArtistPage';
-import { PlayerBar } from './components/PlayerBar';
+
+function RequireAuth() {
+  const token = useAuthStore((s) => s.token);
+  if (!token) return <Navigate to="/login" replace />;
+  return <Outlet />;
+}
 
 function App() {
   return (
-    <>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/" element={<Layout />}>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="search" element={<SearchPage />} />
-          <Route path="library" element={<LibraryPage />} />
+          <Route path="mine" element={<MinePage />} />
           <Route path="playlist/:id" element={<PlaylistPage />} />
-          <Route path="album/:id" element={<AlbumPage />} />
-          <Route path="artist/:id" element={<ArtistPage />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <PlayerBar />
-    </>
+        <Route path="now-playing" element={<NowPlayingPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
